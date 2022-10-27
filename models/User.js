@@ -7,14 +7,7 @@ const userSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      validate: {
-        validator: (email) => {
-          return /^([a-z0-9_\.-]+)@([\da-z\.-]+)\.([a-z\.]{2,6})$/gi.test(
-            email
-          );
-        },
-        message: (email) => `${email.value} is not a valid email`,
-      },
+      match: /^([a-z0-9_\.-]+)@([\da-z\.-]+)\.([a-z\.]{2,6})$/,
     },
     thoughts: [
       {
@@ -30,9 +23,10 @@ const userSchema = new Schema(
     ],
   },
   {
-    toJson: {
+    toJSON: {
       virtuals: true,
     },
+    id: false,
   }
 );
 
@@ -40,6 +34,6 @@ userSchema.virtual("friendCount").get(function () {
   return this.friends.length;
 });
 
-const Users = model("user", userSchema);
+const User = model("user", userSchema);
 
-module.exports = Users;
+module.exports = User;

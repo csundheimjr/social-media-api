@@ -1,116 +1,114 @@
-const { Thoughts, Users } = require("../models");
+const Thought = require("../models/Thought");
+const User = require("../models/User");
 
 module.exports = {
-  async getThoughts(req, res) {
-    try {
-      const allThoughts = await Thoughts.find();
-      return res.json(allThoughts);
-    } catch (err) {
-      res.status(500).json(err);
-    }
+  getAllThoughts(req, res) {
+    Thought.find()
+      .then((thoughts) => res.json(thoughts))
+      .catch((err) => res.status(500).json(err));
   },
-  async createThought(req, res) {
-    try {
-      const newThought = await Thoughts.create(req.body);
-      const userUpdate = await Users.findOneAndUpdate(
-        { username: req.body.username },
-        { $addToSet: { thoughts: newThought._id } },
-        { new: true }
-      );
-      if (!userUpdate) {
-        return res.status(404).json({
-          message: "Thought created, but no user with that username",
-          newThought,
-        });
-      }
-      return res.json({ message: "Thought created!", newThought });
-    } catch (err) {
-      res.status(500).json(err);
-    }
+
+  getSingleThought(req, res) {
+    Thought.findOne({ _id: req.params.thoughtId })
+      .select("-__v")
+      .populate("reactions")
+      .then((thought) => {
+        if (!thought) {
+          res.status(404).json({
+            message: "No thought found with that Id",
+          });
+        } else {
+          res.json(thought);
+        }
+      })
+      .catch((err) => res.status(500).json(err));
   },
-  async getOneThought(req, res) {
-    try {
-      const singleThought = await Thoughts.findOne({
-        _id: req.params.thoughtId,
-      });
-      if (!singleThought) {
-        return res.status(404).json({ message: "No thought with this ID" });
-      }
-      return res.json(singleThought);
-    } catch (err) {
-      res.status(500).json(err);
-    }
+
+  createThought(req, res) {
+    Thought.create(req.body)
+      .then((userData) => {
+        User.findByIdAndUpdate(
+          { username: req.body.userName },
+          {
+            $push: { thoughts: userData._id },
+          },
+          { new: true }
+        );
+        res.json(userData);
+      })
+      .catch((err) => res.status(500).json(err));
   },
-  async updateThought(req, res) {
-    try {
-      const updatedThought = await Thoughts.findOneAndUpdate(
-        { _id: req.params.thoughtId },
-        { $set: req.body },
-        { runValidators: true, new: true }
-      );
-      if (!updatedThought) {
-        return res.status(404).json({ message: "No thought with this ID" });
-      }
-      return res.json(updatedThought);
-    } catch (err) {
-      res.status(500).json(err);
-    }
+
+  updateThought(req, res) {
+    Thought.findOneAndUpdate(
+      { _id: req.params.thoughtId },
+      { $set: req.body },
+      { runValidators: true, new: true }
+    )
+      .then((updatedThought) => {
+        if (!updatedThought) {
+          res.status(404).json({
+            message: "No thought with that Id",
+          });
+        } else {
+          res.json(updatedThought);
+        }
+      })
+      .catch((err) => res.status(500).json(err));
   },
-  async deleteThought(req, res) {
-    try {
-      const deletedThought = await Thoughts.findOneAndDelete({
-        _id: req.params.thoughtId,
-      });
-      if (!deletedThought) {
-        return res.status(404).json({ message: "No thought with this ID" });
-      }
-      const thoughtsUser = await Users.findOneAndUpdate(
-        {
-          thoughts: req.params.thoughtId,
+
+  deleteThought(req, res) {
+    Thought.findByIdAndRemove({ _id: req.params.thoughtId })
+      .then((deletedThought) => {
+        if (!deletedThought) {
+          res.status(404).json({
+            message: "No thought with that Id",
+          });
+        } else {
+          res.json("Thought deleted");
+        }
+      })
+      .catch((err) => res.status(500).json(err));
+  },
+
+  createReaction(req, res) {
+    Thought.findByIdAndUpdate(
+      { _id: req.params.thoughtId },
+      {
+        $addToSet: {
+          reactions: req.body,
         },
-        { $pull: { thoughts: req.params.thoughtId } },
-        { new: true }
-      );
-      if (!thoughtsUser) {
-        return res.status(404).json({
-          message: "Thought deleted but no user with this thought",
-        });
-      }
-      return res.json({ message: "Thought Deleted!" });
-    } catch (err) {
-      res.status(500).json(err);
-    }
+      },
+      { runValidators: true, new: true }
+    )
+      .then((newReaction) => {
+        if (!newReaction) {
+          res.status(404).json({
+            message: "No thought found with that Id",
+          });
+        } else {
+          res.json(newReaction);
+        }
+      })
+      .catch((err) => res.status(500).json(err));
   },
-  async addReaction(req, res) {
-    try {
-      const newReaction = await Thoughts.findOneAndUpdate(
-        { _id: req.params.thoughtId },
-        { $addToSet: { reactions: req.body } },
-        { runValidators: true, new: true }
-      );
-      if (!newReaction) {
-        return res.status(404).json({ message: "No thought with this ID" });
-      }
-      return res.json(newReaction);
-    } catch (err) {
-      res.status(500).json(err);
-    }
-  },
-  async removeReaction(req, res) {
-    try {
-      const removedReaction = await Thoughts.findOneAndUpdate(
-        {
-          _id: req.params.thoughtId,
-        },
-        { $pull: { reactions: { reactionId: req.params.reactionId } } },
-        { runValidators: true, new: true }
-      );
-      if (!removedReaction) {
-        return res.status(404).json({ message: "No thought with this ID" });
-      }
-      return res.json(removedReaction);
-    } catch (err) {
-      res.status(500).json(err);
-    }
+
+  deleteReaction(req, res) {
+    Thought.findOneAndUpdate(
+      { _id: req.params.thoughtId },
+
+      { $pull: { reactions: { reactionId: req.params.reactionId } } },
+      { runValidators: true, new: true }
+    )
+      .then((removedReaction) => {
+        if (!removedReaction) {
+          res.status(404).json({
+            message: "No thought with that Id",
+          });
+        } else {
+          res.json("Reaction removed from thought");
+        }
+      })
+      .catch((err) => res.status(500).json(err));
   },
 };
